@@ -1,0 +1,162 @@
+# Product & Technical Specification: Singapore Private Property Valuation Prototype (Fixed & Final)
+
+## 1. Executive Summary
+**Objective:** Build a web application that ingests Singapore private residential property transaction data via the URA Data Service API, stores and normalizes historical transactions in a local database (SQLite/PostgreSQL), and provides an interactive dashboard for property owners and investors to track market values ($ total and $/sqm or $/sqft) across developments, streets, planning areas, postal districts, and custom geographical radii.
+
+---
+
+## 2. System Architecture
+
+```text
+┌────────────────────────────────────────────────────────┐
+│                   Frontend (Client)                    │
+│      Vite + React + Recharts + Leaflet (OpenStreetMap)  │
+└───────────────────────────┬────────────────────────────┘
+                            │ REST APIs
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│              Backend Server (Node.js / Express)        │
+│  - Data Aggregator & Haversine Query Engine            │
+│  - Ingestion Orchestrator (URA API Batch Fetcher)       │
+│  - OneMap Geocoder Service                             │
+│  - Mock Data Generator (Offline / Demo fallback)       │
+└───────────────┬────────────────────────┬───────────────┘
+                │                        │
+  Daily/Weekly  │                        │ Read / Write
+                ▼                        ▼
+┌────────────────────────┐      ┌────────────────────────┐
+│  External APIs         │      │ Local Database         │
+│  - URA API (Batches 1-4)      │ (SQLite / PostgreSQL)  │
+│  - OneMap (Geocoding)  │      │ Cleaned history &      │
+└────────────────────────┘      │ spatial index          │
+                                └────────────────────────┘
+```
+
+---
+
+## 3. Data Ingestion & API Pipeline
+
+### A. URA API Token Exchange & Multi-Batch Workflow
+URA requires exchanging a static `AccessKey` for a dynamic daily token, and retrieving transaction data across 4 distinct batches.
+
+1. **Token Generation Endpoint:**
+   * **URL:** `https://www.ura.gov.sg/uraHttp/insertToken.action`
+   * **Headers:** `AccessKey: <YOUR_URA_ACCESS_KEY>`, `User-Agent: Mozilla/5.0`
+   * **Response:** JSON `{ "result": "<DAILY_TOKEN>", "status": "1" }` valid for 24 hours.
+
+2. **Transaction Data Fetch Endpoints (Batches 1 to 4):**
+   * **URL:** `https://www.ura.gov.sg/uraHttp/loadData.action?service=PMI_Resi_Transaction&batch={1|2|3|4}`
+   * **Headers:** `AccessKey: <YOUR_URA_ACCESS_KEY>`, `Token: <DAILY_TOKEN>`
+   * **Response:** Array of project objects containing transaction lists.
+
+3. **Data Transformation Rules:**
+   * **Date Parsing:** URA returns dates as `MMYY` (e.g., `0524` = May 2024). Transformed to ISO date format `2024-05-01`.
+   * **Unit Conversions:** `area_sqft = area_sqm * 10.7639`, `psft_sgd = price_sgd / area_sqft`.
+
+### B. OneMap Geocoding & Location Resolution
+During project ingestion, the geocoder queries OneMap Search API (`https://www.onemap.gov.sg/api/common/elastic/search?searchVal={project_or_street}&returnGeom=Y&getAddrDetails=Y`) to resolve:
+* Latitude & Longitude (WGS84 & SVY21)
+* Postal Code & Building Name
+* Planning Area (e.g. *Bedok, Marine Parade, Bukit Merah*)
+
+---
+
+## 4. Database Schema (SQLite / PostgreSQL)
+
+### 1. Projects Table (`projects`)
+```sql
+CREATE TABLE IF NOT EXISTS projects (
+    project_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_name TEXT NOT NULL UNIQUE,
+    street_name TEXT NOT NULL,
+    postal_district TEXT NOT NULL,       -- e.g. "09", "15"
+    market_segment TEXT NOT NULL,        -- CCR, RCR, OCR
+    planning_area TEXT,                  -- Derived from OneMap (e.g. "Bedok")
+    latitude REAL,                       -- WGS84 Lat
+    longitude REAL,                      -- WGS84 Lng
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 2. Property Transactions Table (`property_transactions`)
+*Note: To resolve duplicate detection without wrongly rejecting identical real-world transactions in the same month, we generate a deterministic transaction hash based on batch index or composite key with transaction sequence.*
+
+```sql
+CREATE TABLE IF NOT EXISTS property_transactions (
+    transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    area_sqm REAL NOT NULL,
+    area_sqft REAL NOT NULL,
+    price_sgd REAL NOT NULL,
+    psqm_sgd REAL NOT NULL,
+    psft_sgd REAL NOT NULL,
+    contract_date TEXT NOT NULL,         -- Format: YYYY-MM-01
+    floor_range TEXT,                    -- e.g. "06 to 10"
+    tenure TEXT,                         -- e.g. "Freehold", "99 yrs lease commence 2015"
+    type_of_sale TEXT,                   -- "Resale", "New Sale", "Sub Sale"
+    property_type TEXT,                  -- "Condominium", "Apartment", "Executive Condominium", "Detached"
+    raw_hash TEXT UNIQUE,                -- Unique MD5 hash of raw transaction payload to prevent duplicate ingest
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_date ON property_transactions(contract_date DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_project ON property_transactions(project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_district ON projects(postal_district);
+CREATE INDEX IF NOT EXISTS idx_projects_street ON projects(street_name);
+CREATE INDEX IF NOT EXISTS idx_projects_planning_area ON projects(planning_area);
+```
+
+---
+
+## 5. Backend Query & Spatial Logic
+
+### A. Haversine Radius Query Engine
+For radius calculations without requiring complex PostGIS extensions in SQLite/Postgres:
+```sql
+-- Distance (km) = 6371 * acos(cos(radians(lat1)) * cos(radians(lat2)) * cos(radians(lng2) - radians(lng1)) + sin(radians(lat1)) * sin(radians(lat2)))
+```
+The Query Engine filters developments within bounding box `[lat_min, lat_max, lng_min, lng_max]` first, then applies exact Haversine distance filtering.
+
+### B. API Endpoints
+
+1. `GET /api/search/suggestions?q=Keppel`
+   Returns categorised results:
+   ```json
+   {
+     "projects": [{ "id": 1, "name": "Reflections at Keppel Bay", "district": "04" }],
+     "streets": ["Keppel Bay View"],
+     "districts": ["04"],
+     "planning_areas": ["Bukit Merah"]
+   }
+   ```
+
+2. `POST /api/analytics/price-trends`
+   Aggregates transaction metrics by Month or Quarter based on selected filters (projects, street, planning area, district, unit size sqm/sqft range, and radius).
+
+3. `POST /api/ingest/trigger`
+   Triggers online URA fetch + OneMap geocoding (or loads mock dataset if no API key is provided).
+
+---
+
+## 6. Target User Interface Capabilities
+
+1. **Unified Search & Dynamic Filter Header:**
+   * Multi-select autocomplete bar for developments, streets, districts, and planning areas.
+   * Map click / radius slider (100m – 5km).
+   * Unit size slider & Sqm/Sqft toggle.
+
+2. **Key Metric Summary Cards:**
+   * Estimated Value (Median sale price over selected period).
+   * Median Rate ($/sqm and $/sqft).
+   * Total Transaction Volume & Price Range.
+
+3. **Analytics & Trend Charts:**
+   * Price Trend Line Chart (Median $/sqm over time) paired with Sales Volume Bar Chart.
+   * Floor Level Scatter Plot (Price vs. Floor Range tier).
+
+4. **Interactive GIS Property Map:**
+   * Leaflet map displaying project markers color-coded by median $/sqm.
+   * Interactive popup showing development summary & quick filter button.
+
+5. **Demo / Offline Mode:**
+   * Embedded mock generator yielding realistic Singapore condos (CCR, RCR, OCR) with multi-year historical transactions for instant out-of-the-box demo without API key setup.

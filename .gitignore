@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# Database files
+server/property.db
+server/property.db-journal
+*.db
+
+# Build output
+client/dist/
+dist/
+
+# Environment & Logs
+.env
+.env.local
+*.log
+.DS_Store
