@@ -152,6 +152,13 @@ export async function getPriceAnalytics(filters = {}) {
     summary.averagePrice = sortedPrices.reduce((sum, p) => sum + p, 0) / sortedPrices.length;
   }
 
+  // Fetch SORA rates lookup
+  const soraRows = await dbAll(`SELECT reference_month, sora_1m, sora_3m FROM sora_rates`);
+  const soraMap = new Map();
+  soraRows.forEach(r => {
+    soraMap.set(r.reference_month, { sora1m: r.sora_1m, sora3m: r.sora_3m });
+  });
+
   // Time-series trend grouping (Monthly)
   const monthlyMap = new Map();
   filteredTx.forEach(tx => {
@@ -171,6 +178,7 @@ export async function getPriceAnalytics(filters = {}) {
     const sPsft = [...data.psftList].sort((a, b) => a - b);
     const sPrice = [...data.priceList].sort((a, b) => a - b);
     const mid = Math.floor(sPsqm.length / 2);
+    const sora = soraMap.get(mKey) || { sora1m: null, sora3m: null };
 
     return {
       period: mKey,
@@ -179,7 +187,9 @@ export async function getPriceAnalytics(filters = {}) {
       avgPsqm: Math.round(sPsqm.reduce((a, b) => a + b, 0) / sPsqm.length),
       medianPsft: Math.round(sPsft.length % 2 !== 0 ? sPsft[mid] : (sPsft[mid - 1] + sPsft[mid]) / 2),
       avgPsft: Math.round(sPsft.reduce((a, b) => a + b, 0) / sPsft.length),
-      medianPrice: Math.round(sPrice.length % 2 !== 0 ? sPrice[mid] : (sPrice[mid - 1] + sPrice[mid]) / 2)
+      medianPrice: Math.round(sPrice.length % 2 !== 0 ? sPrice[mid] : (sPrice[mid - 1] + sPrice[mid]) / 2),
+      sora1m: sora.sora1m,
+      sora3m: sora.sora3m
     };
   }).sort((a, b) => a.period.localeCompare(b.period));
 

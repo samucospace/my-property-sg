@@ -14,9 +14,9 @@ function createCustomIcon(color) {
   });
 }
 
-const cyanIcon = createCustomIcon('#06b6d4');
-const emeraldIcon = createCustomIcon('#10b981');
-const amberIcon = createCustomIcon('#f59e0b');
+const greenIcon = createCustomIcon('#4F7942');
+const terracottaIcon = createCustomIcon('#CB6D51');
+const tealIcon = createCustomIcon('#00B080');
 
 function MapEventsHandler({ onMapClick }) {
   useMapEvents({
@@ -54,12 +54,12 @@ export default function PropertyMap({ mapProjects, filters, setFilters, unitType
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">
-          <Navigation size={18} color="var(--accent-cyan)" />
+          <Navigation size={18} color="var(--color-primary-green)" />
           GIS Development Map & Spatial Radius Filter
         </h3>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Radius: {selectedRadius} km</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Radius: {selectedRadius} km</span>
           <input
             type="range"
             min="0.5"
@@ -73,7 +73,7 @@ export default function PropertyMap({ mapProjects, filters, setFilters, unitType
                 setFilters(prev => ({ ...prev, radiusKm: r }));
               }
             }}
-            style={{ width: '100px', cursor: 'pointer' }}
+            style={{ width: '100px', cursor: 'pointer', accentColor: 'var(--color-primary-green)' }}
           />
         </div>
       </div>
@@ -93,8 +93,8 @@ export default function PropertyMap({ mapProjects, filters, setFilters, unitType
               center={[filters.centerCoords.lat, filters.centerCoords.lng]}
               radius={filters.radiusKm * 1000}
               pathOptions={{
-                color: '#3b82f6',
-                fillColor: '#3b82f6',
+                color: '#4F7942',
+                fillColor: '#4F7942',
                 fillOpacity: 0.15,
                 dashArray: '6, 6'
               }}
@@ -104,32 +104,33 @@ export default function PropertyMap({ mapProjects, filters, setFilters, unitType
           {/* Render Project Markers */}
           {mapProjects && mapProjects.map(proj => {
             if (!proj.lat || !proj.lng) return null;
-            const icon = proj.segment === 'CCR' ? cyanIcon : proj.segment === 'RCR' ? emeraldIcon : amberIcon;
+            const icon = proj.segment === 'CCR' ? greenIcon : proj.segment === 'RCR' ? terracottaIcon : tealIcon;
 
             return (
               <Marker key={proj.id} position={[proj.lat, proj.lng]} icon={icon}>
                 <Popup>
-                  <div style={{ fontFamily: 'var(--font-body)', color: '#0f172a' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
+                  <div style={{ fontFamily: 'var(--font-body)', color: '#36454F' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 700, color: '#36454F', fontFamily: 'var(--font-heading)' }}>
                       {proj.name}
                     </h4>
-                    <p style={{ margin: '0 0 6px 0', fontSize: '0.78rem', color: '#64748b' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '0.78rem', color: '#6A7B82' }}>
                       {proj.street} • District {proj.district} ({proj.segment})
                     </p>
-                    <div style={{ background: '#f1f5f9', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', fontSize: '0.8rem' }}>
+                    <div style={{ background: '#F0E6D2', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', fontSize: '0.8rem', color: '#36454F' }}>
                       <div>Median Rate: <strong>${(unitType === 'sqm' ? proj.medianPsqm : proj.medianPsft)?.toLocaleString()}</strong> /{unitType}</div>
                       <div>Sales Recorded: <strong>{proj.txCount} transactions</strong></div>
                     </div>
                     <button
                       onClick={() => handleSelectProjectOnMap(proj.name)}
                       style={{
-                        background: '#3b82f6',
+                        background: '#4F7942',
                         color: 'white',
                         border: 'none',
                         padding: '6px 12px',
                         borderRadius: '6px',
                         fontSize: '0.75rem',
                         fontWeight: 600,
+                        fontFamily: 'var(--font-heading)',
                         cursor: 'pointer',
                         width: '100%'
                       }}
@@ -143,7 +144,7 @@ export default function PropertyMap({ mapProjects, filters, setFilters, unitType
           })}
         </MapContainer>
       </div>
-      <p style={{ fontSize: '0.78rem', color: 'var(--text-subtle)', fontStyle: 'italic' }}>
+      <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
         * Click anywhere on the map to set a center point and apply a geographical radius filter.
       </p>
     </div>

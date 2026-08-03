@@ -408,6 +408,115 @@ export async function seedMockData() {
     }
   }
 
+  // Also seed SORA interest rate benchmark series
+  await seedSoraRates();
+
   console.log(`Seeding complete. Inserted ${seededCount} historical property transactions.`);
   return seededCount;
 }
+
+export async function seedSoraRates() {
+  console.log('Seeding 1M & 3M Compounded SORA benchmark historical rate data...');
+  
+  const soraData = [
+    // 2021
+    { month: '2021-01', sora1m: 0.24, sora3m: 0.28 },
+    { month: '2021-02', sora1m: 0.25, sora3m: 0.29 },
+    { month: '2021-03', sora1m: 0.23, sora3m: 0.27 },
+    { month: '2021-04', sora1m: 0.24, sora3m: 0.26 },
+    { month: '2021-05', sora1m: 0.25, sora3m: 0.28 },
+    { month: '2021-06', sora1m: 0.26, sora3m: 0.29 },
+    { month: '2021-07', sora1m: 0.28, sora3m: 0.31 },
+    { month: '2021-08', sora1m: 0.27, sora3m: 0.30 },
+    { month: '2021-09', sora1m: 0.29, sora3m: 0.32 },
+    { month: '2021-10', sora1m: 0.31, sora3m: 0.33 },
+    { month: '2021-11', sora1m: 0.32, sora3m: 0.35 },
+    { month: '2021-12', sora1m: 0.34, sora3m: 0.37 },
+    // 2022
+    { month: '2022-01', sora1m: 0.38, sora3m: 0.35 },
+    { month: '2022-02', sora1m: 0.45, sora3m: 0.40 },
+    { month: '2022-03', sora1m: 0.55, sora3m: 0.48 },
+    { month: '2022-04', sora1m: 0.72, sora3m: 0.61 },
+    { month: '2022-05', sora1m: 0.98, sora3m: 0.82 },
+    { month: '2022-06', sora1m: 1.25, sora3m: 1.02 },
+    { month: '2022-07', sora1m: 1.58, sora3m: 1.34 },
+    { month: '2022-08', sora1m: 1.92, sora3m: 1.62 },
+    { month: '2022-09', sora1m: 2.22, sora3m: 1.85 },
+    { month: '2022-10', sora1m: 2.55, sora3m: 2.18 },
+    { month: '2022-11', sora1m: 2.88, sora3m: 2.52 },
+    { month: '2022-12', sora1m: 3.10, sora3m: 2.82 },
+    // 2023
+    { month: '2023-01', sora1m: 3.25, sora3m: 3.05 },
+    { month: '2023-02', sora1m: 3.42, sora3m: 3.28 },
+    { month: '2023-03', sora1m: 3.58, sora3m: 3.45 },
+    { month: '2023-04', sora1m: 3.61, sora3m: 3.52 },
+    { month: '2023-05', sora1m: 3.63, sora3m: 3.58 },
+    { month: '2023-06', sora1m: 3.65, sora3m: 3.60 },
+    { month: '2023-07', sora1m: 3.68, sora3m: 3.62 },
+    { month: '2023-08', sora1m: 3.71, sora3m: 3.65 },
+    { month: '2023-09', sora1m: 3.68, sora3m: 3.66 },
+    { month: '2023-10', sora1m: 3.69, sora3m: 3.67 },
+    { month: '2023-11', sora1m: 3.70, sora3m: 3.68 },
+    { month: '2023-12', sora1m: 3.70, sora3m: 3.68 },
+    // 2024
+    { month: '2024-01', sora1m: 3.68, sora3m: 3.68 },
+    { month: '2024-02', sora1m: 3.65, sora3m: 3.66 },
+    { month: '2024-03', sora1m: 3.62, sora3m: 3.64 },
+    { month: '2024-04', sora1m: 3.60, sora3m: 3.62 },
+    { month: '2024-05', sora1m: 3.59, sora3m: 3.61 },
+    { month: '2024-06', sora1m: 3.58, sora3m: 3.60 },
+    { month: '2024-07', sora1m: 3.55, sora3m: 3.57 },
+    { month: '2024-08', sora1m: 3.48, sora3m: 3.52 },
+    { month: '2024-09', sora1m: 3.42, sora3m: 3.48 },
+    { month: '2024-10', sora1m: 3.30, sora3m: 3.38 },
+    { month: '2024-11', sora1m: 3.18, sora3m: 3.26 },
+    { month: '2024-12', sora1m: 3.05, sora3m: 3.18 },
+    // 2025
+    { month: '2025-01', sora1m: 2.95, sora3m: 3.08 },
+    { month: '2025-02', sora1m: 2.90, sora3m: 3.00 },
+    { month: '2025-03', sora1m: 2.85, sora3m: 2.92 },
+    { month: '2025-04', sora1m: 2.78, sora3m: 2.86 },
+    { month: '2025-05', sora1m: 2.70, sora3m: 2.80 },
+    { month: '2025-06', sora1m: 2.65, sora3m: 2.75 },
+    { month: '2025-07', sora1m: 2.60, sora3m: 2.68 },
+    { month: '2025-08', sora1m: 2.55, sora3m: 2.62 },
+    { month: '2025-09', sora1m: 2.50, sora3m: 2.58 },
+    { month: '2025-10', sora1m: 2.45, sora3m: 2.52 },
+    { month: '2025-11', sora1m: 2.42, sora3m: 2.48 },
+    { month: '2025-12', sora1m: 2.40, sora3m: 2.45 },
+    // 2026
+    { month: '2026-01', sora1m: 2.38, sora3m: 2.43 },
+    { month: '2026-02', sora1m: 2.36, sora3m: 2.42 },
+    { month: '2026-03', sora1m: 2.35, sora3m: 2.40 },
+    { month: '2026-04', sora1m: 2.35, sora3m: 2.40 },
+    { month: '2026-05', sora1m: 2.36, sora3m: 2.41 },
+    { month: '2026-06', sora1m: 2.38, sora3m: 2.42 },
+    { month: '2026-07', sora1m: 2.40, sora3m: 2.44 },
+    { month: '2026-08', sora1m: 2.42, sora3m: 2.45 },
+    { month: '2026-09', sora1m: 2.40, sora3m: 2.44 },
+    { month: '2026-10', sora1m: 2.38, sora3m: 2.43 },
+    { month: '2026-11', sora1m: 2.36, sora3m: 2.41 },
+    { month: '2026-12', sora1m: 2.35, sora3m: 2.40 }
+  ];
+
+  await dbRun('BEGIN TRANSACTION');
+  try {
+    for (const item of soraData) {
+      await dbRun(
+        `INSERT INTO sora_rates (reference_month, sora_1m, sora_3m)
+         VALUES (?, ?, ?)
+         ON CONFLICT(reference_month) DO UPDATE SET
+           sora_1m = excluded.sora_1m,
+           sora_3m = excluded.sora_3m,
+           updated_at = CURRENT_TIMESTAMP`,
+        [item.month, item.sora1m, item.sora3m]
+      );
+    }
+    await dbRun('COMMIT');
+    console.log(`Successfully seeded ${soraData.length} SORA rate monthly entries.`);
+  } catch (err) {
+    await dbRun('ROLLBACK');
+    console.error('Error seeding SORA rates:', err);
+  }
+}
+

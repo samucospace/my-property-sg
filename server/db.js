@@ -69,6 +69,15 @@ export async function initDb() {
     );
   `);
 
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS sora_rates (
+      reference_month TEXT PRIMARY KEY,
+      sora_1m REAL NOT NULL,
+      sora_3m REAL NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_transactions_date ON property_transactions(contract_date DESC);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_transactions_project ON property_transactions(project_id);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_projects_district ON projects(postal_district);`);

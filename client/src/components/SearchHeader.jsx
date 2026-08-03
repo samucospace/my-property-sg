@@ -95,8 +95,8 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
     <div className="filter-panel" ref={dropdownRef}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <SlidersHorizontal size={18} color="var(--accent-cyan)" />
-          <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>Property Valuation Filters</span>
+          <SlidersHorizontal size={18} color="var(--color-primary-green)" />
+          <span style={{ fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-heading)' }}>Property Valuation Filters</span>
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -136,7 +136,7 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
               onFocus={() => suggestions && setShowDropdown(true)}
               style={{ paddingLeft: '36px' }}
             />
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+            <Search size={16} color="var(--color-text-muted)" style={{ position: 'absolute', left: '12px', top: '12px' }} />
           </div>
 
           {/* Suggestions Dropdown */}
@@ -147,11 +147,11 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
                   <div className="dropdown-section-title">Developments</div>
                   {suggestions.projects.map(p => (
                     <div key={p.id} className="dropdown-item" onClick={() => handleSelectProject(p.name)}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Building size={14} color="var(--accent-primary)" />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                        <Building size={14} color="var(--color-primary-green)" />
                         {p.name}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>D{p.district} • {p.planningArea}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>D{p.district} • {p.planningArea}</span>
                     </div>
                   ))}
                 </>
@@ -163,10 +163,10 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
                   {suggestions.streets.map((s, idx) => (
                     <div key={idx} className="dropdown-item" onClick={() => handleSelectStreet(s)}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <MapPin size={14} color="var(--accent-cyan)" />
+                        <MapPin size={14} color="var(--color-accent-teal)" />
                         {s}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Street</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Street</span>
                     </div>
                   ))}
                 </>
@@ -178,10 +178,10 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
                   {suggestions.districts.map((d, idx) => (
                     <div key={idx} className="dropdown-item" onClick={() => handleSelectDistrict(d)}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Map size={14} color="var(--accent-amber)" />
+                        <Map size={14} color="var(--color-primary-terracotta)" />
                         District {d}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Postal District</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Postal District</span>
                     </div>
                   ))}
                 </>
@@ -193,10 +193,10 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
                   {suggestions.planningAreas.map((pa, idx) => (
                     <div key={idx} className="dropdown-item" onClick={() => handleSelectPlanningArea(pa)}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <MapPin size={14} color="var(--accent-emerald)" />
+                        <MapPin size={14} color="var(--color-primary-green)" />
                         {pa}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Planning Area</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Planning Area</span>
                     </div>
                   ))}
                 </>
@@ -275,7 +275,7 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
         )}
 
         {filters.radiusKm && filters.centerCoords && (
-          <div className="pill" style={{ borderColor: 'var(--accent-amber)', color: '#fde68a' }}>
+          <div className="pill" style={{ borderColor: 'var(--color-primary-terracotta)', color: 'var(--color-primary-terracotta)', background: 'rgba(203, 109, 81, 0.12)' }}>
             <MapPin size={12} />
             <span>Radius: {filters.radiusKm} km around ({filters.centerCoords.lat.toFixed(3)}, {filters.centerCoords.lng.toFixed(3)})</span>
             <X size={12} className="pill-remove" onClick={() => setFilters(prev => ({ ...prev, radiusKm: null, centerCoords: null }))} />

@@ -52,27 +52,27 @@ export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete
     <div className="modal-overlay">
       <div className="modal-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem' }}>
-            <Database size={20} color="var(--accent-primary)" />
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--color-text-charcoal)', fontFamily: 'var(--font-heading)' }}>
+            <Database size={20} color="var(--color-primary-green)" />
             URA API Data Ingestion & Demo Sync
           </h3>
           <X size={18} style={{ cursor: 'pointer', opacity: 0.7 }} onClick={onClose} />
         </div>
 
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
           Fetch live Singapore residential transactions from URA Data Service API, or reload the offline mock dataset for rapid testing.
         </p>
 
         {statusMessage && (
-          <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid var(--accent-emerald)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', color: '#a7f3d0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CheckCircle2 size={16} color="var(--accent-emerald)" />
+          <div style={{ background: 'rgba(0, 176, 128, 0.12)', border: '1px solid var(--color-accent-teal)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', color: '#007A59', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CheckCircle2 size={16} color="var(--color-accent-teal)" />
             {statusMessage}
           </div>
         )}
 
         {error && (
-          <div style={{ background: 'rgba(244, 63, 94, 0.15)', border: '1px solid var(--accent-rose)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', color: '#fecdd3', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={16} color="var(--accent-rose)" />
+          <div style={{ background: 'rgba(203, 109, 81, 0.12)', border: '1px solid var(--color-primary-terracotta)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', color: '#9E3F27', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={16} color="var(--color-primary-terracotta)" />
             {error}
           </div>
         )}
@@ -80,7 +80,7 @@ export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete
         <form onSubmit={handleLiveIngestion} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div className="filter-group">
             <label className="filter-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Key size={14} color="var(--accent-cyan)" /> URA Access Key (Daily Token Workflow)
+              <Key size={14} color="var(--color-accent-teal)" /> URA Access Key (Daily Token Workflow)
             </label>
             <input
               type="text"
@@ -98,10 +98,10 @@ export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete
         </form>
 
         <div style={{ position: 'relative', textAlign: 'center', margin: '8px 0' }}>
-          <span style={{ background: 'var(--bg-surface)', padding: '0 10px', fontSize: '0.75rem', color: 'var(--text-subtle)' }}>
+          <span style={{ background: '#FFFFFF', padding: '0 10px', fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
             OR USE DEMO MODE
           </span>
-          <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', position: 'absolute', top: '50%', width: '100%', zIndex: -1 }} />
+          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border-subtle)', position: 'absolute', top: '50%', width: '100%', zIndex: -1 }} />
         </div>
 
         <button className="btn" onClick={handleSeedMockData} disabled={loading} style={{ justifyContent: 'center' }}>

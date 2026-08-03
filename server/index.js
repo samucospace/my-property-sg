@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { initDb, dbGet } from './db.js';
-import { seedMockData, fetchUraData } from './ingestion.js';
+import { seedMockData, fetchUraData, seedSoraRates } from './ingestion.js';
 import { getSearchSuggestions, getPriceAnalytics, getAllProjects } from './queryEngine.js';
 
 const app = express();
@@ -85,6 +85,12 @@ async function startServer() {
   if (!projectCount || projectCount.count === 0) {
     console.log('Database empty. Automatically populating initial Singapore property dataset...');
     await seedMockData();
+  }
+
+  const soraCount = await dbGet(`SELECT COUNT(*) as count FROM sora_rates`);
+  if (!soraCount || soraCount.count === 0) {
+    console.log('SORA rate dataset empty. Seeding SORA rates...');
+    await seedSoraRates();
   }
 
   app.listen(PORT, () => {
