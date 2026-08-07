@@ -54,10 +54,94 @@ const CustomTooltip = ({ active, payload, label, unitType, show1mSora, show3mSor
   return null;
 };
 
-export default function AnalyticsCharts({ timeSeries, scatterPoints, unitType }) {
+export default function AnalyticsCharts({ timeSeries = [], scatterPoints = [], bedroomBreakdown = [], unitType = 'sqm', viewMode = 'sale' }) {
   const [activeTab, setActiveTab] = useState('trend');
   const [show1mSora, setShow1mSora] = useState(true);
   const [show3mSora, setShow3mSora] = useState(true);
+
+  if (viewMode === 'rental') {
+    return (
+      <div className="card">
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+          <h3 className="card-title">
+            <TrendingUp size={18} color="var(--color-primary-terracotta)" />
+            Rental Rate & Gross Yield Breakdown Analytics
+          </h3>
+
+          <div className="tab-buttons">
+            <button
+              className={`tab-btn ${activeTab === 'trend' ? 'active' : ''}`}
+              onClick={() => setActiveTab('trend')}
+            >
+              <TrendingUp size={14} /> Rental Price Trend
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'bedroom' ? 'active' : ''}`}
+              onClick={() => setActiveTab('bedroom')}
+            >
+              <Layers size={14} /> Bedroom Yield Breakdown
+            </button>
+          </div>
+        </div>
+
+        <div style={{ height: '380px', width: '100%', padding: '16px 8px 8px 8px' }}>
+          {activeTab === 'trend' ? (
+            timeSeries.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={timeSeries} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748B' }} dy={8} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#64748B' }} unit=" $" />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#64748B' }} />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === 'avgRent') return [`$${value.toLocaleString()} /mo`, 'Average Rent'];
+                      if (name === 'avgRentPsft') return [`$${value} /sqft/mo`, 'Rent Rate'];
+                      if (name === 'count') return [`${value} leases`, 'Lease Volume'];
+                      return [value, name];
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Bar yAxisId="right" dataKey="count" name="Lease Volume" fill="#CBD5E1" opacity={0.5} barSize={16} radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="left" type="monotone" dataKey="avgRent" name="Avg Monthly Rent ($)" stroke="#CB6D51" strokeWidth={3} dot={{ r: 3, fill: '#CB6D51' }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', height: '100%', justifyContent: 'center', alignItems: 'center', color: 'var(--color-text-muted)' }}>
+                No rental trend data matching current filters.
+              </div>
+            )
+          ) : (
+            bedroomBreakdown.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={bedroomBreakdown} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="bedroom" tick={{ fontSize: 12, fill: '#334155', fontWeight: 600 }} dy={8} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#10B981' }} unit="%" domain={[0, 8]} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#0EA5E9' }} unit=" $" />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === 'avgYield') return [`${value}%`, 'Gross Yield'];
+                      if (name === 'avgRent') return [`$${value.toLocaleString()} /mo`, 'Avg Monthly Rent'];
+                      if (name === 'count') return [`${value} leases`, 'Recorded Leases'];
+                      return [value, name];
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Bar yAxisId="left" dataKey="avgYield" name="Gross Yield (%)" fill="#10B981" barSize={32} radius={[6, 6, 0, 0]} />
+                  <Line yAxisId="right" type="monotone" dataKey="avgRent" name="Avg Rent ($/mo)" stroke="#0EA5E9" strokeWidth={3} dot={{ r: 4 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', height: '100%', justifyContent: 'center', alignItems: 'center', color: 'var(--color-text-muted)' }}>
+                No bedroom breakdown data matching current filters.
+              </div>
+            )
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card">

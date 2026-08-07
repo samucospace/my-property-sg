@@ -78,11 +78,45 @@ export async function initDb() {
     );
   `);
 
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS amenities (
+      amenity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      name TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      details TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS rental_transactions (
+      rental_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      area_sqm REAL NOT NULL,
+      area_sqft REAL NOT NULL,
+      rent_sgd REAL NOT NULL,
+      rent_psqm REAL NOT NULL,
+      rent_psft REAL NOT NULL,
+      lease_date TEXT NOT NULL,
+      bedroom_count TEXT,
+      floor_area_range TEXT,
+      property_type TEXT,
+      raw_hash TEXT UNIQUE,
+      FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+    );
+  `);
+
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_transactions_date ON property_transactions(contract_date DESC);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_transactions_project ON property_transactions(project_id);`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_rentals_date ON rental_transactions(lease_date DESC);`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_rentals_project ON rental_transactions(project_id);`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_rentals_bedroom ON rental_transactions(bedroom_count);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_projects_district ON projects(postal_district);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_projects_street ON projects(street_name);`);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_projects_planning_area ON projects(planning_area);`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_amenities_category ON amenities(category);`);
 
   console.log('Database initialized successfully.');
 }

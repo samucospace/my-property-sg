@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Search, X, SlidersHorizontal, MapPin, Building, Map, RefreshCw } from 'lucide-react';
 
-export default function SearchHeader({ filters, setFilters, unitType, setUnitType, onOpenIngestionModal }) {
+export default function SearchHeader({ filters, setFilters, unitType, setUnitType, viewMode = 'sale', setViewMode, onOpenIngestionModal }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -40,30 +40,42 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
   }, []);
 
   const handleSelectProject = (projName) => {
-    if (!filters.projects.includes(projName)) {
-      setFilters(prev => ({
-        ...prev,
-        projects: [...prev.projects, projName]
-      }));
-    }
+    const match = suggestions?.projects?.find(p => p.name === projName);
+    setFilters(prev => ({
+      ...prev,
+      projects: [projName],
+      centerCoords: match && match.lat && match.lng ? { lat: match.lat, lng: match.lng } : null
+    }));
     setSearchTerm('');
     setShowDropdown(false);
   };
 
   const handleSelectStreet = (streetName) => {
-    setFilters(prev => ({ ...prev, street: streetName }));
+    setFilters(prev => ({
+      ...prev,
+      street: streetName,
+      centerCoords: null
+    }));
     setSearchTerm('');
     setShowDropdown(false);
   };
 
   const handleSelectDistrict = (district) => {
-    setFilters(prev => ({ ...prev, district: district }));
+    setFilters(prev => ({
+      ...prev,
+      district: district,
+      centerCoords: null
+    }));
     setSearchTerm('');
     setShowDropdown(false);
   };
 
   const handleSelectPlanningArea = (planningArea) => {
-    setFilters(prev => ({ ...prev, planningArea: planningArea }));
+    setFilters(prev => ({
+      ...prev,
+      planningArea: planningArea,
+      centerCoords: null
+    }));
     setSearchTerm('');
     setShowDropdown(false);
   };
@@ -81,22 +93,64 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
       street: null,
       district: null,
       planningArea: null,
+      bedroomCount: 'all',
       radiusKm: null,
       centerCoords: null,
       dateFrom: '2021-01-01',
       dateTo: '2026-12-31',
       unitSizeMin: 0,
-      unitSizeMax: 300
+      unitSizeMax: 3000
     });
     setSearchTerm('');
   };
 
   return (
     <div className="filter-panel" ref={dropdownRef}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <SlidersHorizontal size={18} color="var(--color-primary-green)" />
-          <span style={{ fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-heading)' }}>Property Valuation Filters</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        {/* Module Mode Switcher */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', background: '#F1F5F9', padding: '3px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+            <button
+              onClick={() => setViewMode && setViewMode('sale')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: 'none',
+                background: viewMode === 'sale' ? '#FFFFFF' : 'transparent',
+                color: viewMode === 'sale' ? 'var(--color-primary-green)' : 'var(--color-text-muted)',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: viewMode === 'sale' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              🏷️ Sale Valuation & Trends
+            </button>
+            <button
+              onClick={() => setViewMode && setViewMode('rental')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: 'none',
+                background: viewMode === 'rental' ? '#FFFFFF' : 'transparent',
+                color: viewMode === 'rental' ? 'var(--color-primary-terracotta)' : 'var(--color-text-muted)',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: viewMode === 'rental' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              🗝️ Rental & Gross Yield (%)
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -226,6 +280,25 @@ export default function SearchHeader({ filters, setFilters, unitType, setUnitTyp
             onChange={e => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
           />
         </div>
+
+        {/* Bedroom Count Filter (Rental Mode Only) */}
+        {viewMode === 'rental' && (
+          <div className="filter-group">
+            <label className="filter-label">Bedroom Count</label>
+            <select
+              className="input-box"
+              value={filters.bedroomCount || 'all'}
+              onChange={e => setFilters(prev => ({ ...prev, bedroomCount: e.target.value }))}
+            >
+              <option value="all">All Bedroom Types</option>
+              <option value="1-Bedder">1-Bedder</option>
+              <option value="2-Bedder">2-Bedder</option>
+              <option value="3-Bedder">3-Bedder</option>
+              <option value="4-Bedder">4-Bedder</option>
+              <option value="5-Bedder">5-Bedder / Penthouse</option>
+            </select>
+          </div>
+        )}
 
         {/* Unit Size Min/Max */}
         <div className="filter-group">

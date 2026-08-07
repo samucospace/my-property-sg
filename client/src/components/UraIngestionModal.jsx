@@ -4,9 +4,11 @@ import { X, Database, Key, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-r
 
 export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete }) {
   const [accessKey, setAccessKey] = useState('');
+  const [jsonInput, setJsonInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [importMode, setImportMode] = useState('api'); // 'api' or 'file'
 
   if (!isOpen) return null;
 
@@ -19,48 +21,69 @@ export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete
 
     setLoading(true);
     setError(null);
-    setStatusMessage('Connecting to URA Data Service (Token Exchange & Batches 1-4)...');
+    setStatusMessage('Connecting to URA Data Service backend pipeline...');
+
+    const cleanKey = accessKey.trim();
 
     try {
-      const res = await axios.post('/api/ingest/ura', { accessKey: accessKey.trim() });
-      setStatusMessage(`Live ingestion complete! Successfully stored ${res.data.totalIngested} transaction caveats.`);
+      setStatusMessage('Requesting URA daily token & fetching sale transaction batches & rental quarters...');
+      const backendRes = await axios.post('/api/ingest/ura', { accessKey: cleanKey });
+      setStatusMessage(`Live URA API sync complete! Stored ${backendRes.data.totalRentalsIngested || 0} rental contracts and ${backendRes.data.totalSalesIngested || 0} sales caveats into property.db.`);
       onIngestionComplete();
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
+    } catch (backendErr) {
+      console.error('Backend URA ingestion error:', backendErr);
+      setError(backendErr.response?.data?.error || backendErr.message || 'Failed to sync with URA API.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSeedMockData = async () => {
+  const handleFileImport = async (e) => {
+    e.preventDefault();
+    if (!jsonInput.trim()) {
+      setError('Please paste or select a URA JSON dataset export.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    setStatusMessage('Generating realistic Singapore property dataset...');
+    setStatusMessage('Parsing and ingesting real URA contract dataset into SQLite database...');
 
     try {
-      const res = await axios.post('/api/ingest/seed');
-      setStatusMessage(`Mock seed complete! Loaded ${res.data.count} transactions across CCR, RCR, & OCR developments.`);
+      const parsed = JSON.parse(jsonInput);
+      const res = await axios.post('/api/ingest/import-data', { jsonData: parsed });
+      setStatusMessage(`Real URA Data Import complete! Successfully stored ${res.data.totalSalesIngested} sales and ${res.data.totalRentalsIngested} rental contracts into database.`);
       onIngestionComplete();
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      setError(err.response?.data?.error || err.message || 'Invalid JSON format.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setJsonInput(event.target.result);
+    };
+    reader.readAsText(file);
   };
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card">
+      <div className="modal-card" style={{ maxWidth: '540px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--color-text-charcoal)', fontFamily: 'var(--font-heading)' }}>
             <Database size={20} color="var(--color-primary-green)" />
-            URA API Data Ingestion & Demo Sync
+            Real URA Data Synchronization & Database Builder
           </h3>
           <X size={18} style={{ cursor: 'pointer', opacity: 0.7 }} onClick={onClose} />
         </div>
 
         <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
-          Fetch live Singapore residential transactions from URA Data Service API, or reload the offline mock dataset for rapid testing.
+          Build your persistent real-world Singapore property database (`property.db`). Ingest official government records directly via live URA API or by importing raw URA data exports.
         </p>
 
         {statusMessage && (
@@ -77,38 +100,79 @@ export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete
           </div>
         )}
 
-        <form onSubmit={handleLiveIngestion} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div className="filter-group">
-            <label className="filter-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Key size={14} color="var(--color-accent-teal)" /> URA Access Key (Daily Token Workflow)
-            </label>
-            <input
-              type="text"
-              className="input-box"
-              placeholder="Paste URA Access Key here..."
-              value={accessKey}
-              onChange={e => setAccessKey(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ justifyContent: 'center' }}>
-            {loading ? <RefreshCw size={16} className="spin" /> : 'Run Live URA API Ingestion'}
+        <div style={{ display: 'flex', gap: '8px', margin: '8px 0' }}>
+          <button
+            type="button"
+            className={`btn ${importMode === 'api' ? 'btn-primary' : ''}`}
+            onClick={() => setImportMode('api')}
+            style={{ flex: 1, fontSize: '0.8rem', justifyContent: 'center' }}
+          >
+            <Key size={14} /> Option 1: Live URA API Key
           </button>
-        </form>
-
-        <div style={{ position: 'relative', textAlign: 'center', margin: '8px 0' }}>
-          <span style={{ background: '#FFFFFF', padding: '0 10px', fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-            OR USE DEMO MODE
-          </span>
-          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border-subtle)', position: 'absolute', top: '50%', width: '100%', zIndex: -1 }} />
+          <button
+            type="button"
+            className={`btn ${importMode === 'file' ? 'btn-primary' : ''}`}
+            onClick={() => setImportMode('file')}
+            style={{ flex: 1, fontSize: '0.8rem', justifyContent: 'center' }}
+          >
+            <Database size={14} /> Option 2: Import Real Data File
+          </button>
         </div>
 
-        <button className="btn" onClick={handleSeedMockData} disabled={loading} style={{ justifyContent: 'center' }}>
-          <RefreshCw size={14} /> Re-seed Offline Realistic Dataset
-        </button>
+        {importMode === 'api' ? (
+          <form onSubmit={handleLiveIngestion} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="filter-group">
+              <label className="filter-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Key size={14} color="var(--color-accent-teal)" /> URA Access Key (Daily Token Service)
+              </label>
+              <input
+                type="text"
+                className="input-box"
+                placeholder="Paste URA Access Key here..."
+                value={accessKey}
+                onChange={e => setAccessKey(e.target.value)}
+                disabled={loading}
+              />
+            </div>
 
-        <div style={{ textAlign: 'right', marginTop: '8px' }}>
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ justifyContent: 'center' }}>
+              {loading ? <RefreshCw size={16} className="spin" /> : 'Fetch & Save Live URA Contracts to Database'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleFileImport} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="filter-group">
+              <label className="filter-label">Upload URA Export JSON File</label>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleFileUpload}
+                className="input-box"
+                style={{ paddingTop: '6px' }}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Or Paste Real URA JSON Dataset Payload</label>
+              <textarea
+                className="input-box"
+                rows={4}
+                placeholder="Paste URA API JSON result or array payload..."
+                value={jsonInput}
+                onChange={e => setJsonInput(e.target.value)}
+                disabled={loading}
+                style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ justifyContent: 'center' }}>
+              {loading ? <RefreshCw size={16} className="spin" /> : 'Import Real URA Dataset into Database'}
+            </button>
+          </form>
+        )}
+
+        <div style={{ textAlign: 'right', marginTop: '12px' }}>
           <button className="btn" onClick={onClose} style={{ fontSize: '0.8rem' }}>Close</button>
         </div>
       </div>

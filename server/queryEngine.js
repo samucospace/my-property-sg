@@ -1,4 +1,5 @@
 import { dbAll, dbGet } from './db.js';
+import { calculateLivabilityScore } from './livabilityEngine.js';
 
 // Haversine distance in kilometers
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -65,7 +66,8 @@ export async function getPriceAnalytics(filters = {}) {
     dateTo = '2026-12-31',
     unitSizeMin = 0,
     unitSizeMax = 10000,
-    unitType = 'sqm'
+    unitType = 'sqm',
+    lifestyleWeights = null
   } = filters;
 
   // Calculate size in SQM for SQL filtering
@@ -162,7 +164,6 @@ export async function getPriceAnalytics(filters = {}) {
   // Time-series trend grouping (Monthly)
   const monthlyMap = new Map();
   filteredTx.forEach(tx => {
-    // contract_date format: YYYY-MM-01 -> month key YYYY-MM
     const monthKey = tx.contract_date.substring(0, 7);
     if (!monthlyMap.has(monthKey)) {
       monthlyMap.set(monthKey, { month: monthKey, psqmList: [], psftList: [], priceList: [] });
@@ -193,7 +194,7 @@ export async function getPriceAnalytics(filters = {}) {
     };
   }).sort((a, b) => a.period.localeCompare(b.period));
 
-  // Floor tier scatter plot points (sampled max 200 points for chart performance)
+  // Floor tier scatter plot points
   const scatterPoints = filteredTx.slice(-200).map(t => ({
     id: t.transaction_id,
     date: t.contract_date,
@@ -204,7 +205,8 @@ export async function getPriceAnalytics(filters = {}) {
     areaSqm: t.area_sqm,
     areaSqft: Math.round(t.area_sqft),
     projectName: t.project_name,
-    typeOfSale: t.type_of_sale
+    typeOfSale: t.type_of_sale,
+    projectId: t.project_id
   }));
 
   // Distinct Developments for Map display
@@ -229,10 +231,17 @@ export async function getPriceAnalytics(filters = {}) {
     item.psftList.push(t.psft_sgd);
   });
 
-  const mapProjects = Array.from(mapProjectsMap.values()).map(p => {
+  // Pre-fetch all amenities once for in-memory spatial scoring
+  const allAmenities = await dbAll(`SELECT amenity_id, category, name, latitude as latitude, longitude as longitude, details FROM amenities`);
+
+  const mapProjectsList = Array.from(mapProjectsMap.values());
+  const mapProjects = await Promise.all(mapProjectsList.map(async p => {
     const sPsqm = [...p.psqmList].sort((a, b) => a - b);
     const sPsft = [...p.psftList].sort((a, b) => a - b);
     const mid = Math.floor(sPsqm.length / 2);
+
+    const livability = await calculateLivabilityScore(p.lat, p.lng, lifestyleWeights, allAmenities);
+
     return {
       id: p.id,
       name: p.name,
@@ -244,9 +253,10 @@ export async function getPriceAnalytics(filters = {}) {
       lng: p.lng,
       txCount: p.psqmList.length,
       medianPsqm: Math.round(sPsqm.length % 2 !== 0 ? sPsqm[mid] : (sPsqm[mid - 1] + sPsqm[mid]) / 2),
-      medianPsft: Math.round(sPsft.length % 2 !== 0 ? sPsft[mid] : (sPsft[mid - 1] + sPsft[mid]) / 2)
+      medianPsft: Math.round(sPsft.length % 2 !== 0 ? sPsft[mid] : (sPsft[mid - 1] + sPsft[mid]) / 2),
+      livability
     };
-  });
+  }));
 
   return {
     summary,
@@ -256,8 +266,276 @@ export async function getPriceAnalytics(filters = {}) {
   };
 }
 
-// 3. Get all projects overview for map initialize
-export async function getAllProjects() {
+// 4. Rental & Gross Rental Yield Analytics Engine
+export async function getRentalYieldAnalytics(filters = {}) {
+  const {
+    projects = [],
+    street = null,
+    district = null,
+    planningArea = null,
+    radiusKm = null,
+    centerCoords = null,
+    dateFrom = '2021-01-01',
+    dateTo = '2026-12-31',
+    bedroomCount = null,
+    unitSizeMin = 0,
+    unitSizeMax = 10000,
+    unitType = 'sqm',
+    lifestyleWeights = null
+  } = filters;
+
+  const sizeMinSqm = unitType === 'sqft' ? unitSizeMin / 10.7639 : unitSizeMin;
+  const sizeMaxSqm = unitType === 'sqft' ? unitSizeMax / 10.7639 : unitSizeMax;
+
+  let whereClauses = ['r.lease_date >= ? AND r.lease_date <= ?', 'r.area_sqm >= ? AND r.area_sqm <= ?'];
+  let params = [dateFrom.substring(0, 7), dateTo.substring(0, 7), sizeMinSqm, sizeMaxSqm];
+
+  if (Array.isArray(projects) && projects.length > 0) {
+    const placeholders = projects.map(() => '?').join(',');
+    whereClauses.push(`UPPER(p.project_name) IN (${placeholders})`);
+    params.push(...projects.map(p => String(p).toUpperCase()));
+  }
+
+  if (street) {
+    whereClauses.push(`UPPER(p.street_name) = UPPER(?)`);
+    params.push(street);
+  }
+
+  if (district) {
+    whereClauses.push(`p.postal_district = ?`);
+    params.push(String(district).padStart(2, '0'));
+  }
+
+  if (planningArea) {
+    whereClauses.push(`UPPER(p.planning_area) = UPPER(?)`);
+    params.push(planningArea);
+  }
+
+  if (bedroomCount && bedroomCount !== 'all') {
+    whereClauses.push(`r.bedroom_count = ?`);
+    params.push(bedroomCount);
+  }
+
+  const sql = `
+    SELECT r.rental_id, r.project_id, r.area_sqm, r.area_sqft, r.rent_sgd, r.rent_psqm, r.rent_psft,
+           r.lease_date, r.bedroom_count, r.floor_area_range, r.property_type,
+           p.project_name, p.street_name, p.postal_district, p.market_segment, p.planning_area,
+           p.latitude, p.longitude
+    FROM rental_transactions r
+    JOIN projects p ON r.project_id = p.project_id
+    WHERE ${whereClauses.join(' AND ')}
+    ORDER BY r.lease_date DESC
+  `;
+
+  let rows = await dbAll(sql, params);
+
+  // Apply Haversine radius filter if active
+  if (radiusKm && centerCoords && centerCoords.lat && centerCoords.lng) {
+    rows = rows.filter(r => {
+      if (!r.latitude || !r.longitude) return false;
+      const d = haversineDistance(centerCoords.lat, centerCoords.lng, r.latitude, r.longitude);
+      return d <= radiusKm;
+    });
+  }
+
+  if (rows.length === 0) {
+    return {
+      summary: {
+        medianRent: 0,
+        medianRentPsft: 0,
+        medianRentPsqm: 0,
+        avgGrossYield: 0,
+        totalLeases: 0,
+        rentMinMaxRange: { min: 0, max: 0 }
+      },
+      timeSeries: [],
+      bedroomBreakdown: [],
+      rentalCaveats: [],
+      mapProjects: []
+    };
+  }
+
+  // Calculate Median Sale Prices & PSFT per Project for Yield Computations
+  const saleValuationsMap = new Map();
+  const salesRows = await dbAll(
+    `SELECT project_id, price_sgd, psft_sgd FROM property_transactions`
+  );
+  salesRows.forEach(s => {
+    if (!saleValuationsMap.has(s.project_id)) {
+      saleValuationsMap.set(s.project_id, { prices: [], psfts: [] });
+    }
+    const item = saleValuationsMap.get(s.project_id);
+    if (s.price_sgd) item.prices.push(s.price_sgd);
+    if (s.psft_sgd) item.psfts.push(s.psft_sgd);
+  });
+
+  const getProjectSaleValuation = (projId, marketSeg) => {
+    const data = saleValuationsMap.get(projId);
+    if (data && data.prices.length > 0) {
+      const sortedPrices = [...data.prices].sort((a, b) => a - b);
+      const sortedPsfts = [...data.psfts].sort((a, b) => a - b);
+      const medianPrice = sortedPrices[Math.floor(sortedPrices.length / 2)];
+      const medianPsft = sortedPsfts.length > 0 ? sortedPsfts[Math.floor(sortedPsfts.length / 2)] : 1600;
+      return { medianPrice, medianPsft };
+    }
+    // Fallback baseline valuation estimates by segment
+    const medianPrice = marketSeg === 'CCR' ? 2400000 : marketSeg === 'RCR' ? 1650000 : 1250000;
+    const medianPsft = marketSeg === 'CCR' ? 2200 : marketSeg === 'RCR' ? 1650 : 1300;
+    return { medianPrice, medianPsft };
+  };
+
+  const rentsSgd = rows.map(r => r.rent_sgd).sort((a, b) => a - b);
+  const rentsPsft = rows.map(r => r.rent_psft).sort((a, b) => a - b);
+  const rentsPsqm = rows.map(r => r.rent_psqm).sort((a, b) => a - b);
+  const mid = Math.floor(rentsSgd.length / 2);
+
+  const medianRent = rentsSgd.length % 2 !== 0 ? rentsSgd[mid] : Math.round((rentsSgd[mid - 1] + rentsSgd[mid]) / 2);
+  const medianRentPsft = rentsPsft.length % 2 !== 0 ? rentsPsft[mid] : parseFloat(((rentsPsft[mid - 1] + rentsPsft[mid]) / 2).toFixed(2));
+  const medianRentPsqm = rentsPsqm.length % 2 !== 0 ? rentsPsqm[mid] : parseFloat(((rentsPsqm[mid - 1] + rentsPsqm[mid]) / 2).toFixed(2));
+
+  // Compute Individual Lease Caveats & Estimated Gross Yield
+  const rentalCaveats = rows.map(r => {
+    const val = getProjectSaleValuation(r.project_id, r.market_segment);
+    // Gross Yield = (Annual Rent per sqft / Sale Price per sqft) * 100
+    const annualRentPsft = r.rent_psft * 12;
+    const grossYield = parseFloat(((annualRentPsft / val.medianPsft) * 100).toFixed(2));
+    const estimatedSalePrice = Math.round(r.area_sqft * val.medianPsft);
+
+    return {
+      rentalId: r.rental_id,
+      projectName: r.project_name,
+      streetName: r.street_name,
+      district: r.postal_district,
+      leaseDate: r.lease_date,
+      rentSgd: r.rent_sgd,
+      rentPsft: r.rent_psft,
+      rentPsqm: r.rent_psqm,
+      areaSqft: r.area_sqft,
+      areaSqm: r.area_sqm,
+      bedroomCount: r.bedroom_count || 'Unspecified',
+      floorAreaRange: r.floor_area_range || `${Math.round(r.area_sqft)} sqft`,
+      estimatedSaleValuation: estimatedSalePrice,
+      grossYield
+    };
+  });
+
+  const totalYieldSum = rentalCaveats.reduce((sum, r) => sum + r.grossYield, 0);
+  const avgGrossYield = parseFloat((totalYieldSum / rentalCaveats.length).toFixed(2));
+
+  // Bedroom Breakdown Aggregation
+  const bedroomGroups = new Map();
+  rentalCaveats.forEach(r => {
+    const b = r.bedroomCount;
+    if (!bedroomGroups.has(b)) {
+      bedroomGroups.set(b, { count: 0, rentSum: 0, yieldSum: 0, psftSum: 0 });
+    }
+    const item = bedroomGroups.get(b);
+    item.count += 1;
+    item.rentSum += r.rentSgd;
+    item.yieldSum += r.grossYield;
+    item.psftSum += r.rentPsft;
+  });
+
+  const bedroomBreakdown = Array.from(bedroomGroups.entries()).map(([bedroom, stats]) => ({
+    bedroom,
+    count: stats.count,
+    avgRent: Math.round(stats.rentSum / stats.count),
+    avgYield: parseFloat((stats.yieldSum / stats.count).toFixed(2)),
+    avgPsft: parseFloat((stats.psftSum / stats.count).toFixed(2))
+  })).sort((a, b) => a.bedroom.localeCompare(b.bedroom));
+
+  // Time Series Aggregation by Month
+  const timeMap = new Map();
+  rentalCaveats.forEach(r => {
+    const m = r.leaseDate;
+    if (!timeMap.has(m)) {
+      timeMap.set(m, { rentSum: 0, psftSum: 0, count: 0 });
+    }
+    const t = timeMap.get(m);
+    t.rentSum += r.rentSgd;
+    t.psftSum += r.rentPsft;
+    t.count += 1;
+  });
+
+  const timeSeries = Array.from(timeMap.entries())
+    .map(([month, data]) => ({
+      month,
+      avgRent: Math.round(data.rentSum / data.count),
+      avgRentPsft: parseFloat((data.psftSum / data.count).toFixed(2)),
+      count: data.count
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  // Map Projects Aggregation with Gross Yield & Rental Rates
+  const mapProjectsMap = new Map();
+  rows.forEach(r => {
+    if (!mapProjectsMap.has(r.project_id)) {
+      mapProjectsMap.set(r.project_id, {
+        id: r.project_id,
+        name: r.project_name,
+        street: r.street_name,
+        district: r.postal_district,
+        planningArea: r.planning_area,
+        segment: r.market_segment,
+        lat: r.latitude,
+        lng: r.longitude,
+        rents: [],
+        psfts: []
+      });
+    }
+    const p = mapProjectsMap.get(r.project_id);
+    p.rents.push(r.rent_sgd);
+    p.psfts.push(r.rent_psft);
+  });
+
+  const allAmenities = await dbAll(`SELECT amenity_id, category, name, latitude as latitude, longitude as longitude, details FROM amenities`);
+
+  const mapProjects = await Promise.all(Array.from(mapProjectsMap.values()).map(async p => {
+    const sortedRents = [...p.rents].sort((a, b) => a - b);
+    const sortedPsfts = [...p.psfts].sort((a, b) => a - b);
+    const mIndex = Math.floor(sortedRents.length / 2);
+    const projMedianRent = sortedRents[mIndex];
+    const projMedianPsft = sortedPsfts[mIndex];
+    const val = getProjectSaleValuation(p.id, p.segment);
+    const grossYield = parseFloat(((projMedianPsft * 12 / val.medianPsft) * 100).toFixed(2));
+    const livability = await calculateLivabilityScore(p.lat, p.lng, lifestyleWeights, allAmenities);
+
+    return {
+      id: p.id,
+      name: p.name,
+      street: p.street,
+      district: p.district,
+      planningArea: p.planningArea,
+      segment: p.segment,
+      lat: p.lat,
+      lng: p.lng,
+      txCount: p.rents.length,
+      medianRent: projMedianRent,
+      medianRentPsft: projMedianPsft,
+      medianSaleValuation: val.medianPrice,
+      grossYield,
+      livability
+    };
+  }));
+
+  return {
+    summary: {
+      medianRent,
+      medianRentPsft,
+      medianRentPsqm,
+      avgGrossYield,
+      totalLeases: rows.length,
+      rentMinMaxRange: { min: rentsSgd[0], max: rentsSgd[rentsSgd.length - 1] }
+    },
+    timeSeries,
+    bedroomBreakdown,
+    rentalCaveats,
+    mapProjects
+  };
+}
+
+// 5. Get all projects overview for map initialize
+export async function getAllProjects(lifestyleWeights = null) {
   const projects = await dbAll(
     `SELECT p.project_id as id, p.project_name as name, p.street_name as street, p.postal_district as district,
             p.market_segment as segment, p.planning_area as planningArea, p.latitude as lat, p.longitude as lng,
@@ -268,5 +546,15 @@ export async function getAllProjects() {
      LEFT JOIN property_transactions t ON p.project_id = t.project_id
      GROUP BY p.project_id`
   );
-  return projects;
+
+  const allAmenities = await dbAll(`SELECT amenity_id, category, name, latitude as latitude, longitude as longitude, details FROM amenities`);
+
+  return await Promise.all(projects.map(async p => {
+    const livability = await calculateLivabilityScore(p.lat, p.lng, lifestyleWeights, allAmenities);
+    return {
+      ...p,
+      livability
+    };
+  }));
 }
+
