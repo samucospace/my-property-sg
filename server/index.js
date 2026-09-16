@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { initDb, dbGet, dbAll } from './db.js';
-import { fetchUraData, importRealUraData, seedSoraRates, seedRealisticRentalData } from './ingestion.js';
+import { fetchUraData, importRealUraData, seedSoraRates, seedRealisticRentalData, seedMockData } from './ingestion.js';
 import { getSearchSuggestions, getPriceAnalytics, getAllProjects, getRentalYieldAnalytics } from './queryEngine.js';
 import { seedAmenities, calculateLivabilityScore } from './livabilityEngine.js';
 
@@ -149,9 +149,32 @@ app.post('/api/ingest/ura', async (req, res) => {
   }
 });
 
+// 9. Re-seed Database with Realistic Demo / Mock Dataset (No API Key Required)
+app.post('/api/ingest/seed', async (req, res) => {
+  try {
+    const salesCount = await seedMockData();
+    await seedRealisticRentalData();
+    res.json({
+      status: 'success',
+      message: 'Successfully generated realistic Singapore property demo dataset.',
+      salesCount
+    });
+  } catch (err) {
+    console.error('Error seeding demo data:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Startup logic
 async function startServer() {
   await initDb();
+
+  const projectCount = await dbGet(`SELECT COUNT(*) as count FROM projects`);
+  if (!projectCount || projectCount.count === 0) {
+    console.log('Database empty on startup. Automatically generating realistic Singapore property demo dataset...');
+    await seedMockData();
+    await seedRealisticRentalData();
+  }
 
   const soraCount = await dbGet(`SELECT COUNT(*) as count FROM sora_rates`);
   if (!soraCount || soraCount.count === 0) {
@@ -169,4 +192,5 @@ async function startServer() {
 startServer().catch(err => {
   console.error('Failed to start server:', err);
 });
+
 

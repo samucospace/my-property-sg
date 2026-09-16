@@ -1,24 +1,38 @@
 # Singapore Private Property Valuation & Analytics Portal (`my-property-SG`)
 
-An interactive web application that ingests Singapore private residential transaction data via the **URA Data Service API**, normalizes historical transactions in a local SQLite database, and provides a real-time analytics dashboard for property owners, buyers, and investors.
+An interactive web application that ingests Singapore private residential transaction and rental data via the **URA Data Service API**, converts spatial coordinates via a zero-latency in-memory SVY21 mathematical engine, normalizes historical transactions in a local SQLite database, and delivers a real-time valuation, rental yield, and livability analytics dashboard.
+
+---
+
+## 🚀 Instant Demo & Offline Mode (No API Key Required)
+
+**You do NOT need a paid or official URA Data Service API key to run and evaluate this project.**
+
+The repository includes a built-in **Offline / Mock Data Generator**:
+- **Automatic Initialization**: On first launch, if the local SQLite database is empty, the backend automatically seeds 10 representative prime Singapore condominium developments across Core Central Region (CCR), Rest of Central Region (RCR), and Outside Central Region (OCR) with 5 years of historical transaction caveats (2021–2026), realistic tenancy rental contracts, monthly SORA interest benchmark rates, and spatial MRT/school amenities.
+- **Instant UI Exploration**: You can immediately search developments, filter by district/region, examine price trends, compare rental yields, inspect floor-tier scatter plots, and explore GIS map markers.
+- **One-Click Re-seeding**: You can re-seed or reset the demo dataset at any time via the **Sync URA API Data** modal (Option 1: Offline Demo Data) or by calling `POST /api/ingest/seed`.
 
 ---
 
 ## Key Features
 
-- **Live URA API Data Sync**: Automated token exchange with URA's API Gateway (`eservice.ura.gov.sg`) and multi-batch ingestion (`batches 1–4`) with deterministic MD5 payload deduplication.
-- **Zero-Latency SVY21 Spatial Converter**: Mathematical conversion of Singapore SVY21 coordinates to WGS84 (Lat/Lng) in 0ms without external API rate limits.
-- **Interactive GIS Development Map**: Built with Leaflet & OpenStreetMap, featuring color-coded markers for developments (CCR, RCR, OCR) and interactive map click radius filtering.
+- **Instant Offline Demo Generator**: Realistic 5-year Singapore property sales caveats, rental yields, and benchmark interest rates out of the box.
+- **Live URA API Data Sync**: Automated daily token exchange with URA's API Gateway (`eservice.ura.gov.sg`), multi-batch sales ingestion (`batches 1–4`), and quarterly rental contract synchronization with deterministic MD5 payload deduplication.
+- **Zero-Latency SVY21 Spatial Converter**: Pure mathematical conversion of Singapore Transverse Mercator (SVY21) coordinates to WGS84 (Lat/Lng) in 0ms without external API dependencies or rate limits.
+- **Interactive GIS Development Map**: Leaflet map featuring color-coded development markers (CCR, RCR, OCR), dynamic map click radius filtering, and interactive popups with key valuation metrics.
 - **Valuation & Floor Tier Analytics**: Dual-axis Recharts time-series ($/sqm or $/sqft rate vs transaction volume) and floor-tier scatter plot analysis.
-- **Unified Autocomplete Filter**: Fast search bar supporting mixed queries across developments, street names, postal districts, and planning areas.
-- **Offline / Demo Mode**: Pre-loaded mock generator yielding realistic 5-year Singapore property data out of the box.
+- **Rental Yield & Tenancy Engine**: Compares gross rental yields against 1M & 3M compounded SORA historical benchmarks across bedroom configurations (1-bedder to 4-bedder).
+- **Amenities & Livability Scoring**: Calculates walking distance and density scores to nearest MRT stations, primary schools, supermarkets, and parks.
+- **Unified Autocomplete Filter**: Fast multi-attribute search across project names, street names, postal districts, and planning areas.
 
 ---
 
 ## Tech Stack
 
-- **Backend**: Node.js, Express, SQLite (`sqlite3`), Axios.
+- **Backend**: Node.js (ES Modules), Express, SQLite (`sqlite3`), Axios.
 - **Frontend**: React 18, Vite, Recharts, Leaflet (`react-leaflet`), Lucide Icons.
+- **GIS / Math**: Native SVY21 (Singapore Transverse Mercator) to WGS84 projection algorithm.
 
 ---
 
@@ -59,7 +73,8 @@ Open two terminal windows (or run commands from separate shells):
 cd server
 npm start
 ```
-*Output: `Backend server running on http://localhost:3001`*
+*Output: `Backend server running on http://localhost:3001`*  
+*(The database automatically initializes and populates the demo dataset if empty).*
 
 #### Terminal 2: Start Frontend Vite Dev Server (Port 3000)
 ```bash
@@ -72,16 +87,20 @@ npm run dev
 
 ### Step 3: Open in Browser
 
-Open [http://localhost:3000/](http://localhost:3000/) in your web browser.
+Open [http://localhost:3000/](http://localhost:3000/) in your web browser. The dashboard will load with pre-populated property data ready for analysis.
 
 ---
 
-## Live URA API Ingestion
+## Data Synchronization Modes
 
-1. Click **Sync URA API Data** in the top-right header of the web app.
-2. Enter your static **URA Access Key** obtained from the [URA Developer Portal](https://eservice.ura.gov.sg/maps/api/#authentication).
-3. Click **Run Live URA API Ingestion**.
-4. The system will retrieve today's daily token and populate historical transactions into your local database.
+Click **Sync URA API Data** in the top-right header of the web app to choose between three modes:
+
+1. **Option 1: Offline Demo Data (Default / Immediate)**
+   - Click **Generate / Reset Offline Demo Dataset** to populate realistic multi-year Singapore property data without needing any credentials.
+2. **Option 2: Live URA API Key**
+   - Provide your static **URA Access Key** obtained from the [URA Developer Portal](https://eservice.ura.gov.sg/maps/api/#authentication). The server handles daily token retrieval and pulls live sales batches and rental quarters.
+3. **Option 3: Import Data File**
+   - Upload or paste exported URA JSON payload files directly to parse and persist real caveats into your local database.
 
 ---
 
@@ -89,15 +108,19 @@ Open [http://localhost:3000/](http://localhost:3000/) in your web browser.
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/health` | Health check endpoint |
+| `GET` | `/api/health` | Health check and server status |
 | `GET` | `/api/search/suggestions?q=...` | Autocomplete search for projects, streets, districts, and planning areas |
 | `POST` | `/api/analytics/price-trends` | Aggregates price trends ($/sqm, $/sqft), scatter points, and spatial map markers |
+| `POST` | `/api/analytics/rental-yields` | Aggregates rental prices, gross rental yields, and SORA rate comparisons |
 | `GET` | `/api/projects` | Overview list of all registered developments |
-| `POST` | `/api/ingest/ura` | Body: `{ "accessKey": "YOUR_KEY" }` — Triggers live URA token exchange & batch 1–4 download |
-| `POST` | `/api/ingest/seed` | Re-seeds database with realistic Singapore property demo dataset |
+| `GET` | `/api/projects/:id/livability` | Computes project livability score and nearby amenity breakdown |
+| `GET` | `/api/amenities` | Retrieves GIS POIs (MRT stations, schools, supermarkets, parks) |
+| `POST` | `/api/ingest/seed` | Generates / re-seeds database with realistic Singapore property demo dataset |
+| `POST` | `/api/ingest/ura` | Body: `{ "accessKey": "YOUR_KEY" }` — Live URA token exchange & batch download |
+| `POST` | `/api/ingest/import-data` | Body: `{ "jsonData": [...] }` — Imports raw URA transaction & rental JSON export |
 
 ---
 
 ## License
 
-MIT License. Built for Singapore private residential property market analysis.
+This project is open-source under the [MIT License](LICENSE). Copyright (c) 2026 samucospace.

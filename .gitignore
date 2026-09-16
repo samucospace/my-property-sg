@@ -3,17 +3,31 @@ node_modules/
 server/node_modules/
 client/node_modules/
 
-# Database files
+# SQLite & Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
 server/property.db
 server/property.db-journal
-*.db
 
 # Build output
 client/dist/
 dist/
 
-# Environment & Logs
+# Environment variables & secrets
 .env
+.env.*
 .env.local
+
+# Logs & OS artifacts
 *.log
 .DS_Store
+Thumbs.db
+
+# Screenshots & scratch scripts
+screenshot*.png
+server/scratch_*.js
+server/test_*.js

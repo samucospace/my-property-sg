@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { X, Database, Key, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Database, Key, RefreshCw, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete }) {
   const [accessKey, setAccessKey] = useState('');
@@ -8,9 +8,26 @@ export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
   const [error, setError] = useState(null);
-  const [importMode, setImportMode] = useState('api'); // 'api' or 'file'
+  const [importMode, setImportMode] = useState('demo'); // 'demo', 'api', or 'file'
 
   if (!isOpen) return null;
+
+  const handleSeedDemo = async () => {
+    setLoading(true);
+    setError(null);
+    setStatusMessage('Generating 5-year realistic Singapore property transactions and rental contracts dataset...');
+
+    try {
+      const res = await axios.post('/api/ingest/seed');
+      setStatusMessage(res.data.message || 'Realistic Singapore property demo dataset generated successfully!');
+      onIngestionComplete();
+    } catch (err) {
+      console.error('Seed demo error:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to generate demo dataset.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLiveIngestion = async (e) => {
     e.preventDefault();
@@ -100,26 +117,55 @@ export default function UraIngestionModal({ isOpen, onClose, onIngestionComplete
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '8px', margin: '8px 0' }}>
+        <div style={{ display: 'flex', gap: '6px', margin: '8px 0', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={`btn ${importMode === 'demo' ? 'btn-primary' : ''}`}
+            onClick={() => setImportMode('demo')}
+            style={{ flex: 1, minWidth: '130px', fontSize: '0.78rem', justifyContent: 'center' }}
+          >
+            <Sparkles size={14} /> Option 1: Offline Demo Data
+          </button>
           <button
             type="button"
             className={`btn ${importMode === 'api' ? 'btn-primary' : ''}`}
             onClick={() => setImportMode('api')}
-            style={{ flex: 1, fontSize: '0.8rem', justifyContent: 'center' }}
+            style={{ flex: 1, minWidth: '130px', fontSize: '0.78rem', justifyContent: 'center' }}
           >
-            <Key size={14} /> Option 1: Live URA API Key
+            <Key size={14} /> Option 2: Live URA API Key
           </button>
           <button
             type="button"
             className={`btn ${importMode === 'file' ? 'btn-primary' : ''}`}
             onClick={() => setImportMode('file')}
-            style={{ flex: 1, fontSize: '0.8rem', justifyContent: 'center' }}
+            style={{ flex: 1, minWidth: '130px', fontSize: '0.78rem', justifyContent: 'center' }}
           >
-            <Database size={14} /> Option 2: Import Real Data File
+            <Database size={14} /> Option 3: Import Data File
           </button>
         </div>
 
-        {importMode === 'api' ? (
+        {importMode === 'demo' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#F8FAF9', border: '1px solid var(--color-border-light)', borderRadius: '8px', padding: '12px 14px', fontSize: '0.82rem', color: 'var(--color-text-charcoal)', lineHeight: '1.5' }}>
+              <div style={{ fontWeight: 600, color: 'var(--color-primary-green)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <Sparkles size={15} /> Instant Demo Mode (No API Key Required)
+              </div>
+              <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                Quickly explore and test the platform without an official URA account. Populates your local SQLite database with 10 representative prime developments across CCR, RCR, and OCR, including 5 years of transactions, rental yields, SORA rate benchmarks, and amenities.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSeedDemo}
+              disabled={loading}
+              style={{ justifyContent: 'center' }}
+            >
+              {loading ? <RefreshCw size={16} className="spin" /> : 'Generate / Reset Offline Demo Dataset'}
+            </button>
+          </div>
+        ) : importMode === 'api' ? (
           <form onSubmit={handleLiveIngestion} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div className="filter-group">
               <label className="filter-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

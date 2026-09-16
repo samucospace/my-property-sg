@@ -678,4 +678,199 @@ export async function seedRealisticRentalData() {
   }
 }
 
+// 5. Realistic Mock Seed Generator for Instant Demo
+export async function seedMockData() {
+  console.log('Seeding realistic Singapore property dataset for instant demo...');
+
+  const mockDevelopments = [
+    {
+      name: "REFLECTIONS AT KEPPEL BAY",
+      street: "Keppel Bay View",
+      district: "04",
+      segment: "CCR",
+      planningArea: "Bukit Merah",
+      lat: 1.2655,
+      lng: 103.8118,
+      basePsqm: 19500,
+      tenure: "99 yrs leasehold",
+      sizes: [78, 115, 145, 210]
+    },
+    {
+      name: "THE INTERLACE",
+      street: "Depot Road",
+      district: "04",
+      segment: "RCR",
+      planningArea: "Bukit Merah",
+      lat: 1.2824,
+      lng: 103.8037,
+      basePsqm: 14800,
+      tenure: "99 yrs leasehold",
+      sizes: [75, 108, 156, 198]
+    },
+    {
+      name: "MARINA BAY RESIDENCES",
+      street: "Marina Boulevard",
+      district: "01",
+      segment: "CCR",
+      planningArea: "Downtown Core",
+      lat: 1.2801,
+      lng: 103.8540,
+      basePsqm: 24500,
+      tenure: "99 yrs leasehold",
+      sizes: [66, 105, 162, 220]
+    },
+    {
+      name: "D'LEEDON",
+      street: "Leedon Heights",
+      district: "10",
+      segment: "CCR",
+      planningArea: "Bukit Timah",
+      lat: 1.3138,
+      lng: 103.7824,
+      basePsqm: 17800,
+      tenure: "99 yrs leasehold",
+      sizes: [60, 97, 138, 175]
+    },
+    {
+      name: "WALLICH RESIDENCE",
+      street: "Wallich Street",
+      district: "02",
+      segment: "CCR",
+      planningArea: "Downtown Core",
+      lat: 1.2764,
+      lng: 103.8447,
+      basePsqm: 31000,
+      tenure: "99 yrs leasehold",
+      sizes: [57, 89, 122, 185]
+    },
+    {
+      name: "CANNINGHILL PIERS",
+      street: "River Valley Road",
+      district: "06",
+      segment: "CCR",
+      planningArea: "Singapore River",
+      lat: 1.2912,
+      lng: 103.8436,
+      basePsqm: 28500,
+      tenure: "99 yrs leasehold",
+      sizes: [48, 76, 116, 150]
+    },
+    {
+      name: "COSTA DEL SOL",
+      street: "Bayshore Road",
+      district: "16",
+      segment: "OCR",
+      planningArea: "Bedok",
+      lat: 1.3068,
+      lng: 103.9372,
+      basePsqm: 13200,
+      tenure: "99 yrs leasehold",
+      sizes: [88, 121, 142, 165]
+    },
+    {
+      name: "AMBER PARK",
+      street: "Amber Gardens",
+      district: "15",
+      segment: "RCR",
+      planningArea: "Marine Parade",
+      lat: 1.2995,
+      lng: 103.8996,
+      basePsqm: 23800,
+      tenure: "Freehold",
+      sizes: [43, 77, 121, 190]
+    },
+    {
+      name: "PASIR RIS 8",
+      street: "Pasir Ris Drive 8",
+      district: "18",
+      segment: "OCR",
+      planningArea: "Pasir Ris",
+      lat: 1.3732,
+      lng: 103.9493,
+      basePsqm: 16500,
+      tenure: "99 yrs leasehold",
+      sizes: [48, 67, 95, 121]
+    },
+    {
+      name: "JADESCAPE",
+      street: "Shunfu Road",
+      district: "20",
+      segment: "RCR",
+      planningArea: "Bishan",
+      lat: 1.3524,
+      lng: 103.8415,
+      basePsqm: 17200,
+      tenure: "99 yrs leasehold",
+      sizes: [49, 71, 94, 132]
+    }
+  ];
+
+  const floorRanges = ["01 to 05", "06 to 10", "11 to 15", "16 to 20", "21 to 25", "26 to 30", "31 to 35+"];
+  const saleTypes = ["Resale", "Resale", "Resale", "New Sale", "Sub Sale"];
+
+  let seededCount = 0;
+
+  for (const dev of mockDevelopments) {
+    let projRecord = await dbGet(`SELECT project_id FROM projects WHERE UPPER(project_name) = UPPER(?)`, [dev.name]);
+    let projId;
+
+    if (!projRecord) {
+      const res = await dbRun(
+        `INSERT INTO projects (project_name, street_name, postal_district, market_segment, planning_area, latitude, longitude)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [dev.name, dev.street, dev.district, dev.segment, dev.planningArea, dev.lat, dev.lng]
+      );
+      projId = res.lastID;
+    } else {
+      projId = projRecord.project_id;
+    }
+
+    // Generate transactions from Jan 2021 to Jun 2026
+    for (let year = 2021; year <= 2026; year++) {
+      const maxMonth = year === 2026 ? 7 : 12;
+      for (let month = 1; month <= maxMonth; month += Math.floor(Math.random() * 2) + 1) {
+        const mStr = String(month).padStart(2, '0');
+        const dateStr = `${year}-${mStr}-01`;
+
+        const timeMultiplier = 1 + (year - 2021) * 0.045 + (month / 12) * 0.03;
+        
+        const txCount = Math.floor(Math.random() * 3) + 2;
+        for (let i = 0; i < txCount; i++) {
+          const areaSqm = dev.sizes[Math.floor(Math.random() * dev.sizes.length)] + (Math.random() * 4 - 2);
+          const roundedAreaSqm = Math.round(areaSqm * 100) / 100;
+          const areaSqft = roundedAreaSqm * 10.7639;
+
+          const floorIdx = Math.floor(Math.random() * floorRanges.length);
+          const floorBoost = 1 + floorIdx * 0.025;
+
+          const noise = 1 + (Math.random() * 0.08 - 0.04);
+          const psqm = Math.round(dev.basePsqm * timeMultiplier * floorBoost * noise * 100) / 100;
+          const price = Math.round(psqm * roundedAreaSqm);
+          const psft = Math.round((price / areaSqft) * 100) / 100;
+
+          const floorRange = floorRanges[floorIdx];
+          const typeOfSale = saleTypes[Math.floor(Math.random() * saleTypes.length)];
+          const rawHash = generateTxHash(dev.name, dateStr, price, roundedAreaSqm, floorRange + `_${i}`);
+
+          try {
+            await dbRun(
+              `INSERT INTO property_transactions 
+               (project_id, area_sqm, area_sqft, price_sgd, psqm_sgd, psft_sgd, contract_date, floor_range, tenure, type_of_sale, property_type, raw_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [projId, roundedAreaSqm, areaSqft, price, psqm, psft, dateStr, floorRange, dev.tenure, typeOfSale, 'Condominium', rawHash]
+            );
+            seededCount++;
+          } catch (err) {
+            // Ignore hash collisions
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`Seeding complete. Inserted ${seededCount} historical property transactions.`);
+  return seededCount;
+}
+
+
 
